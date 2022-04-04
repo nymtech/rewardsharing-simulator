@@ -18,7 +18,7 @@ class Plot_Results:
     # samples mix nodes with amounts of pledge/delegation compatible with the specified stake in the specified year
     def scatterplot_rewards_staking(self, file_name, stake, year):
 
-        rewards = self.results.get_annualized_rewards_no_compound_vs_saturation(stake)
+        rewards = self.results.sample_annualized_rewards_no_compound_vs_saturation(stake)
         sequence_x_vals_pledge = []
         sequence_y_vals_pledge = []
         sequence_x_vals_del = []
@@ -225,8 +225,8 @@ class Plot_Results:
             plt.savefig(file_name)
         plt.close()
 
-    # plot total income to the network including the split between emitted inflation and collected bw fees
-    # plot rewards rewards distributed and rewards unclaimed (thus returned to inflation pool)
+    # plot total income to the network including the split between emitted mixmining rewards and collected bw fees
+    # plot rewards rewards distributed and rewards unclaimed (thus returned to mixmining pool)
     def plot_rewards_distributed_unclaimed(self, file_name):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
@@ -236,7 +236,7 @@ class Plot_Results:
         else:
             ax.plot(self.results.income_global_mix, '-', linewidth=2, label='R(t): Budget mixnet rewards (mixmining+fees)')
             ax.plot(self.results.share_income_bw_mix, '-', linewidth=1, label='0.6*F(t): Bw fees for mixnet')
-            ax.plot(self.results.mixmining_emitted, '-', linewidth=1, label='0.02*P(t): Mixmining emissions')
+            ax.plot(self.results.mixmining_emitted, '-', linewidth=1, label='0.02*P(t): Mixmining rewards')
         ax.plot(self.results.rewards_distributed_mix, ':', linewidth=2, label='Σ Ri(t): Rewards distributed')
         ax.plot(self.results.rewards_unclaimed, ':', linewidth=2, label='U(t): Unclaimed rewards')
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
@@ -261,7 +261,7 @@ class Plot_Results:
         ax.plot(self.results.circulating_tokens, '-', linewidth=1, label='circulating tokens')
         ax.plot(self.results.unvested_tokens, ':', linewidth=1, label='unvested token')
         ax.set_xlabel('interval (monthly)', fontsize=14)
-        ax.set_ylabel('amount of token (vested, circulating, in inflation pool)', fontsize=14)
+        ax.set_ylabel('amount of token (vested, circulating, in mixmining pool)', fontsize=14)
         plt.setp(ax.get_xticklabels(), fontsize=14)
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
