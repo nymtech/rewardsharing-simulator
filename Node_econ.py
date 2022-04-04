@@ -9,13 +9,13 @@ class Node:
         self.profit_margin = profit_margin  # profit margin set by the node operator (between 0 and 1)
         self.performance = performance  # measured performance of the node (between 0 and 1)
         self.node_cost = node_cost  # monthly operational cost of the node as declared by the node operator
-        self.stake_saturation = stake_saturation  # saturation point per node in the interval (global value)
+        self.stake_saturation = stake_saturation  # saturation point per node (global value per interval)
         self.delegated = 0  # amount of delegated stake. This is updated after object creation.
         self.lambda_node = 0  # ratio of pledge to total stake. Updated after delegated stake has been set.
         self.sigma_node = 0  # ratio of delegated to total stake. Updated after delegated stake has been set.
         self.activity_percent = 0  # fraction of epochs in the interval where the node is active
         self.reserve_percent = 0  # fraction of epochs in the interval where the node is in reserve
-        self.received_rewards = 0  # rewards actually received by the node
+        self.received_rewards = 0  # rewards received by the node (to be split between operator and delegates)
         self.operator_profit = 0  # profit given to the operator (who in addition is also refunded for the node costs)
         self.delegate_profit = 0  # aggregate profits given to the set of delegates for all delegated stake
 
