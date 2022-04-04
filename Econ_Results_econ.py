@@ -105,8 +105,8 @@ class Econ_Results:
         # self.update_pp(month)  # update price per packet (affects income from bw fees). Baseline is constant value.
         self.update_lists_nodes(month)  # updates the list of all nodes with their individual pledge and delegation
         self.update_costs(month)  # updates the node operational costs in token (must come after update_token_price)
-        self.update_mixmining_pool_and_available_rewards(month)  # updates the inflation pool, emitted inflation, bw income
-        self.assign_rewards_to_nodes(month)  # updates the potential and actual rewards per node (dep. pledge/stake)
+        self.update_mixmining_pool_and_available_rewards(month)  # updates the mixmining pool, rewards, bw income
+        self.assign_rewards(month)  # updates the potential and actual rewards per node (dep. pledge/stake)
 
         # for each node distribute the rewards among individual operators and their delegates
         for mix in self.network.list_mix[month]:
@@ -165,8 +165,8 @@ class Econ_Results:
         self.pp_token[month] = self.pp_dollar[month] * self.token_per_dollar[month]
 
     ###############
-    # updates the lists of mix nodes in the network object for the current month
-    # network.create_list_mixes() function does the main job (assign to each node a pledge and delegated stake)
+    # updates the list of mix nodes in the network object for the current month
+    # network.create_list_mixes() function does the actual job (assign to each node a pledge and delegated stake)
     def update_lists_nodes(self, month):
 
         # create the lists of mix nodes for the new interval
@@ -185,16 +185,16 @@ class Econ_Results:
             mix.node_cost += mix.activity_percent * bw_cost
 
     ####################################
-    # updates values for mixmining pool, emitted inflation and income from fees
+    # updates values for mixmining pool, emitted mixmining rewards and income from fees
     # updates variables keeping track of aggregated network income
     def update_mixmining_pool_and_available_rewards(self, month):
 
-        # update the inflation pool amount and the emitted inflation in the current month
+        # update the mixmining pool amount and the emitted mixmining rewards in the current month
         if month > 0:
-            # current inflation pool = previous pool minus previous emitted inflation plus returned (unclaimed) rewards
+            # current mixmining pool = previous pool minus previous emitted rewards plus returned (unclaimed) rewards
             self.mixmining_pool[month] = self.mixmining_pool[month - 1] - self.mixmining_emitted[month - 1] + \
                                          self.rewards_unclaimed[month - 1]
-            # the newly emitted inflation is a percentage of the current (updated) inflation pool
+            # the newly emitted rewards are a percentage of the current (updated) mixmining pool
             self.mixmining_emitted[month] = self.mixmining_pool[month] * self.config.emission_rate
 
         # compute the share of bandwidth income to be distributed to each category of operator
@@ -207,22 +207,9 @@ class Econ_Results:
         self.income_global[month] = self.income_global_mix[month] + self.share_income_bw_gw[month]
 
     ####################################
-    # sets the values for rewards (potential and received) for each node
-    # takes the pot of rewards for each category of operators and computes the R_i (white paper formula) for each node
-    # updates global variables on rewards received by each category and unclaimed rewards to put back in inflation pool
-    def assign_rewards_to_nodes(self, month):
-
-        # compute rewards distributed to each of the mixes (depending on their pledge, stake, performance)
-        self.assign_rewards_to_mixes(month)
-
-        # aggregate of rewards distributed to nodes and gws. Note these are not profits: costs NOT YET subtracted
-        self.rewards_distributed[month] = self.rewards_distributed_mix[month] + self.share_income_bw_gw[month]
-        # amount of rewards unclaimed and returned to the mixmining pool
-        self.rewards_unclaimed[month] = self.income_global[month] - self.rewards_distributed[month]
-
-    ####################################
     # takes the pot of rewards for mix nodes and computes the R_i (white paper formula) for each individual mix
-    def assign_rewards_to_mixes(self, month):
+    # updates global variables on rewards distributed and unclaimed (that are put back in mixmining pool)
+    def assign_rewards(self, month):
 
         active_nodes = self.config.mixnet_layers * self.network.mixnet_width[month]
         idle_nodes = self.network.k[month] - active_nodes
@@ -230,20 +217,25 @@ class Econ_Results:
         work_active = factor / (factor * self.network.k[month] - (factor - 1) * idle_nodes)
         work_idle = 1 / (factor * self.network.k[month] - (factor - 1) * idle_nodes)
 
+        # compute rewards distributed to each of the mixes (depending on their pledge, stake, performance)
         for mix in self.network.list_mix[month]:
-
             # received rewards (formula rewards paper) for the epochs when the node was active
             mix.received_rewards = mix.activity_percent * mix.performance * self.income_global_mix[month] * \
                                    mix.sigma_node * self.network.k[month] * (work_active + self.config.alpha *
                                                                              mix.lambda_node) / (1 + self.config.alpha)
             # received rewards (formula rewards paper) for the epochs when the node was in reserve
             mix.received_rewards += mix.reserve_percent * mix.performance * self.income_global_mix[month] * \
-                                   mix.sigma_node * self.network.k[month] * (work_idle + self.config.alpha *
-                                                                             mix.lambda_node) / (1 + self.config.alpha)
+                                    mix.sigma_node * self.network.k[month] * (work_idle + self.config.alpha *
+                                                                              mix.lambda_node) / (1 + self.config.alpha)
             # mix receives nothing for (1 - mix.activity_percent - mix.reserve_percent) where it's not selected
 
             # set variables for distributed and unclaimed (diff between potential and actual) rewards
             self.rewards_distributed_mix[month] += mix.received_rewards
+
+        # aggregate of rewards distributed to nodes and gws. Note these are not profits: costs NOT YET subtracted
+        self.rewards_distributed[month] = self.rewards_distributed_mix[month] + self.share_income_bw_gw[month]
+        # amount of rewards unclaimed and returned to the mixmining pool
+        self.rewards_unclaimed[month] = self.income_global[month] - self.rewards_distributed[month]
 
     ###################################
     # Given a mix node, this function splits the profit between the operator and the delegates.
@@ -263,14 +255,6 @@ class Econ_Results:
         else:  # if there is no profit, delegates get nothing and the loss is on the operator profit (who paid costs)
             mix.operator_profit = profit
             mix.delegate_profit = 0
-            # print a warning when a mix node is not covering costs (print commands can also be commented out)
-            # print("Mix node does not make enough profit to cover costs!")
-            # print("month=", month, "; serial=", mix.serial)
-            # print("node pledge=", round(mix.pledge), "; total (delegated+pledge) stake=",
-            #      round(mix.pledge + mix.delegated), "; sigma=", mix.sigma_node, "; lambda=", mix.lambda_node)
-            # print("node work share", round(mix.work_share, 4))
-            # print("node costs=", round(mix.node_cost), "; received rewards=", round(mix.received_rewards))
-            # print("operator profit=", round(mix.operator_profit), "; delegates profit= 0  \n")
 
     # This function returns a dictionary where dict_distr[month] is a vector with the values for parameter 'par'
     # for the list of existing nodes (ordered by node index)
@@ -339,7 +323,7 @@ class Econ_Results:
     # function returns a dictionary with 2 scenarios: pledge or delegate to a mix node
     # for each of the two scenarios, sample nodes representing the rewards that the stakeholder would
     # obtain for pledging/delegating the available stake on a node
-    def get_annualized_rewards_no_compound_vs_saturation(self, stake):
+    def sample_annualized_rewards_no_compound_vs_saturation(self, stake):
 
         # rewards dictionary contains a dictionary for each of options: pledge/delegate on a mix
         rewards = {'pledge-mix': {}, 'sat-pledge-mix': {}, 'delegate-mix': {}, 'sat-delegate-mix': {}}
