@@ -1,4 +1,3 @@
-import cProfile
 import os
 import string
 import random
@@ -61,19 +60,49 @@ def sanity_check_results(results):
 
 
 # prints to screen the parameter values of the mix node object passed to the function
-def print_info_node(mix):
-    print("mix node nr", mix.serial, "; sat level", mix.sat_level, "; node cost:", round(mix.node_cost))
-    print("pledge:", round(mix.pledge), "; lambda", round(mix.lambda_node, 5), "; delegated:", round(mix.delegated),
-          "; sigma", round(mix.sigma_node, 4))
-    print("activity_percent=", round(100 * mix.activity_percent, 2), "%  ; reserve_percent=",
+def print_info_list_nodes(sample_month, results):
+
+    print("\n================\n MONTH:", sample_month, "\n================\n")
+    for mix in results.network.list_mix[sample_month]:
+        print("mix node nr", mix.serial, "; sat level", mix.sat_level)
+        print("node cost:", round(mix.node_cost))
+        print("pledge:", round(mix.pledge), "; lambda", round(mix.lambda_node, 5))
+        print("delegated:", round(mix.delegated), "; sigma", round(mix.sigma_node, 4))
+        print("activity_percent=", round(100 * mix.activity_percent, 2), "%  ; reserve_percent=",
           round(100 * mix.reserve_percent, 2), "%")
-    print("received rewards:", round(mix.received_rewards), "; operator profit:", round(mix.operator_profit),
+        print("received rewards:", round(mix.received_rewards), "; operator profit:", round(mix.operator_profit),
           "; delegate profit:", round(mix.delegate_profit))
-    print("ROS operator:", round(100 * mix.operator_profit / mix.pledge, 2),
-          "%  ; annualized:", round(12 * 100 * mix.operator_profit / mix.pledge, 2), "%")
-    if mix.delegated > 0:
-        print("ROS delegator:", round(100 * mix.delegate_profit / mix.delegated, 2),
-              "%  ; annualized:", round(100 * 12 * mix.delegate_profit / mix.delegated, 2), "%")
+        print("ROS operator:", round(100 * mix.operator_profit / mix.pledge, 2), "%  ; annualized:",
+              round(12 * 100 * mix.operator_profit / mix.pledge, 2), "%")
+        if mix.delegated > 0:
+            print("ROS delegator:", round(100 * mix.delegate_profit / mix.delegated, 2), "%  ; annualized:",
+                  round(100 * 12 * mix.delegate_profit / mix.delegated, 2), "%")
+        print("---")
+
+
+# prints the info of the list of nodes existing in sample_month in a txt file
+def save_info_list_nodes(sample_month, path, results):
+
+    file_name = path + "list_nodes_month" + str(sample_month) + ".txt"
+
+    with open(file_name, "w") as f:
+        f.write("-----\n")
+        for mix in results.network.list_mix[sample_month]:
+            f.write("mix node nr: " + str(mix.serial) + " ; sat level: " + str(mix.sat_level) + "\n")
+            f.write("node cost: " + str(round(mix.node_cost)) + "\n")
+            f.write("pledge: " + str(round(mix.pledge)) + " ; lambda: " + str(round(mix.lambda_node, 5)) + "\n")
+            f.write("delegated: " + str(round(mix.delegated)) + " ; sigma: " + str(round(mix.sigma_node, 5)) + "\n")
+            f.write("activity_percent: " + str(round(100 * mix.activity_percent, 2)) + "%")
+            f.write(" ; reserve_percent: " + str(round(100 * mix.reserve_percent, 2)) + "% \n")
+            f.write("received rewards: " + str(round(mix.received_rewards)))
+            f.write(" ; operator profit: " + str(round(mix.operator_profit)))
+            f.write(" ; delegate profit: " + str(round(mix.delegate_profit)) + "\n")
+            f.write("ROS operator: " + str(round(100 * mix.operator_profit / mix.pledge, 2)) + "%")
+            f.write(" ; annualized: " + str(round(12 * 100 * mix.operator_profit / mix.pledge, 2)) + "% \n")
+            if mix.delegated > 0:
+                f.write("ROS delegator: " + str(round(100 * mix.delegate_profit / mix.delegated, 2)) + "%")
+                f.write(" ; annualized: " + str(round(100 * 12 * mix.delegate_profit / mix.delegated, 2)) + "% \n")
+            f.write("-----\n")
 
 
 # Plot pre-defined bw demand functions available in the Input_Functions library
@@ -122,7 +151,7 @@ def display_save_plots(plot_res, save_to_file, path, config):
                 file_name = 'scatterplot_returns_staking_' + str(stake) + '_y' + str(year) + '.png'
             plot_res.scatterplot_rewards_staking(path + file_name, stake, year)
 
-    # Return on Stake for delegates: yearly delegate rewards divided by the amount of delegated stake
+    # Return on Stake for delegates: yearly delegate rewards divided by the amount of delegated stake (per node)
     for par in ['ROS_delegator_year']:
         if save_to_file:
             file_name = 'ROS_delegates_annualized.png'
@@ -131,11 +160,11 @@ def display_save_plots(plot_res, save_to_file, path, config):
     ####################
     # FIGS TYPE 2: Plot distributions of values (boxplots) over nodes such as: node pledges, received rewards, profits
     # for operators / delegates, etc.
-    # In the function plot_node_parameter_distributions(file_name, type_node, owner, par) the inputs are:
+    # In the function plot_node_parameter_distributions(file_name, par) the inputs are:
     # file_name: pass empty value '' to show graphs on screen -- otherwise a .png file name to save the figure to file
     # par: parameter of interest to be shown, can take the values: 'pledge' 'delegated' 'total_stake' 'node_cost'
     # 'received_rewards' 'operator_profit' 'delegate_profit' 'sigma' 'lambda' 'ROS_operator' (monthly)
-    # 'ROS_delegator' (monthly). Some illustrative examples below.
+    # 'ROS_delegator' (monthly), 'activity_percent', 'reserve_percent', and more. Some illustrative examples below.
     ####################
 
     file_name = ''  # if value of path and filename is '' then shows graphs in screen.
@@ -145,26 +174,26 @@ def display_save_plots(plot_res, save_to_file, path, config):
         plot_res.plot_node_parameter_distributions(path + file_name, par)
 
     ####################
-    # FIGS TYPE 3: Plot distributions of global system variables and averages (instead of node specific values)
+    # FIGS TYPE 3: Plot distributions of global system variables and averages (instead of per-node values/distributions)
     # List of available functions below.
     ####################
 
-    # plot the amount of token in the inflation pool, in circulation, and vested
+    # plot the amount of token in the mixmining pool, in circulation, and unvested
     if save_to_file:
         file_name = 'plot_vesting_circulating_token.png'
     plot_res.plot_vesting_circulating_token(path + file_name)
 
-    # plot the net liquidity coming from the mixmining pool
+    # plot the cumulative net liquidity coming from the mixmining pool (accounting for unclaimed rewards)
     if save_to_file:
         file_name = 'plot_cumulative_mixmining_liquidity.png'
     plot_res.plot_cumulative_mixmining_liquidity(path + file_name)
 
-    # plot the value of saturation stake per node
+    # plot the value of the stake saturation point (global value for all nodes, updated per interval)
     if save_to_file:
         file_name = 'plot_stake_saturation_node.png'
     plot_res.plot_stake_saturation_node(path + file_name)
 
-    # plot the amount of rewards distributed to operators (in aggregate) and returned to the pool (unclaimed)
+    # plot the aggregate amount of rewards distributed and returned to the pool (unclaimed)
     if save_to_file:
         file_name = 'plot_rewards_distributed_unclaimed.png'
     plot_res.plot_rewards_distributed_unclaimed(path + file_name)
@@ -172,7 +201,7 @@ def display_save_plots(plot_res, save_to_file, path, config):
     # plot the bandwidth demand (note that this is a pre-set function chosen according to Configuration variables)
     if save_to_file:
         file_name = 'plot_total_bw.png'
-    if config.type_bw_growth != 'BW_ZERO':  # if 'BW_ZERO' it's simply constant at zero
+    if config.type_bw_growth != 'BW_ZERO':  # if 'BW_ZERO' it's simply constant at zero, nothing to plot
         plot_res.plot_total_bw(path + file_name)
 
     # plot the number of operators of each type over time (if 'BW_ZERO' it's simply constant value in config)
@@ -182,6 +211,7 @@ def display_save_plots(plot_res, save_to_file, path, config):
         plot_res.plot_nr_operators(path + file_name)
 
 
+# main function that instantiates the classes to run a simulation of the system with a the given configuration
 def run_model(save_to_file):
 
     # depending on save_to_file, create a randomly named directory for saving figures, or set path to empty
@@ -204,19 +234,15 @@ def run_model(save_to_file):
     # FOURTH call the desired plotting functions to look into system variables and results of interest
     display_save_plots(plot_res, save_to_file, path, config)
 
-    # print the list of nodes for a month to see if all variables look ok
-    for sample_month in [11]:
-        print("\n MONTH", sample_month)
-        print("================\n")
-        for node in results.network.list_mix[sample_month]:
-            print_info_node(node)
-            print("---")
+    # print the list of nodes for a month to see if all node variables look ok
+    for sample_month in [0, 11]:
+        if save_to_file:  # save info in a file
+            save_info_list_nodes(sample_month, path, results)
+        else:  # print the info to screen
+            print_info_list_nodes(sample_month, results)
 
 
 if __name__ == '__main__':
 
-    # decide if results are to be shown on screen or saved to png files
     save_results_to_file = True  # True / False : if True, plots are saved to file, if False, they are shown on screen
-
     run_model(save_results_to_file)
-    #cProfile.run('run_model(save_results_to_file)')
