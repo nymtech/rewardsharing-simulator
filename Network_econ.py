@@ -21,11 +21,9 @@ class Network:
         self.bw_demand_avg_second = np.divide(self.bw_demand, (3600 * 24 * 30))  # conversion of bw_demand to seconds
         self.mixnet_width = self.set_mixnet_width()  # compute mixnet width per interval considering bw_demand
         self.k = self.set_k_mixes()  # compute nr of rewarded mixes per interval considering bw_demand and configuration
-        self.num_mixes = []  # total number of registered mix nodes, assumed to be in excess of the equilibrium value k
-        for i in range(self.config.num_intervals):
-            self.num_mixes.append(int(round(self.k[i] * self.config.excess_candidate_factor)))
+        self.num_mixes = self.set_num_mixes()  # total number of registered mix nodes, assumed to be in excess of k
 
-        # dictionaries containing values for all nodes of all intervals
+        # dictionary containing values for all nodes of all intervals
         self.list_mix = {}  # dictionary mixes, one entry per interval containing list of mix nodes for the interval
         for month in range(self.config.num_intervals):
             self.list_mix[month] = []  # per interval, create list of Nodes existing in that interval
@@ -58,6 +56,15 @@ class Network:
             k = None  # no other options for now, we could add them if desired
 
         return k
+
+    # Returns a vector with the total number of registered mix nodes per interval (month), a factor over self.k
+    def set_num_mixes(self):
+
+        n = []  # vector with the number of mix nodes registered per interval (always bigger than k)
+        for i in range(self.config.num_intervals):
+            n.append(int(round(self.k[i] * self.config.excess_candidate_factor)))
+
+        return n
 
     # Creates a vector with all the mix nodes and appends them to self.list_mix[month]
     # Sets pledge amounts, delegation amounts and other node variables
@@ -113,7 +120,7 @@ class Network:
         self.set_lambda_sigma_mixnet(month, total_stake)
 
         # Finally, update the activity level (share of workload) of the nodes
-        activity_vector, reserve_vector = self.estimate_work_share_mixes(month)
+        activity_vector, reserve_vector = self.sample_work_share_mixes(month)
         # set the activity and reserve values in each of the nodes of the list for the interval
         for mix in self.list_mix[month]:
             mix.activity_percent = activity_vector[mix.serial]
@@ -133,9 +140,9 @@ class Network:
         while max(normalized_samples) * remaining_pledge > max_excess:
             for ind in range(nr_nodes_rand_pledge):
                 if normalized_samples[ind] * remaining_pledge > max_excess:
-                    # cap the highest (over the max) values to 98% of maximum
-                    normalized_samples[ind] = 0.98 * max_excess / remaining_pledge
-            # renormalize the vector after capping max values to 98% of maximum
+                    # cap the highest (over the max) values to 99% of maximum
+                    normalized_samples[ind] = 0.99 * max_excess / remaining_pledge
+            # renormalize the vector after capping max values to 99% of maximum
             normalized_samples = np.divide(normalized_samples, sum(normalized_samples))
 
         # set excess_pledge for nr_nodes_rand_pledge and leave at zero for the remaining nr_nodes_min_pledge
@@ -174,7 +181,7 @@ class Network:
     # the percentage of epochs the node is selected to be active and in reserve
     # the function returns two vectors indexed by node id, with the % of epochs each node was active and in reserve
     # this function is the most resource-consuming (bottleneck) and could be substituted by a more efficient one
-    def estimate_work_share_mixes(self, month):
+    def sample_work_share_mixes(self, month):
 
         list_cumul = []  # cumulative stake ordered by node index
         cumul = 0.0
