@@ -36,12 +36,13 @@ In addition to changing parameter values in `Configuration_econ.py` to simulate 
 - the current performance bottleneck is the function `sample_work_share_mixes` in the class Network, with the overhead being proportional to `k` (number of rewarded mix nodes per epoch)
 
 
-## Author and License
+## Author
 
-The author of this code is Claudia Diaz, chief scientist at Nym Technologies. 
+Claudia Diaz
 
-**what license should we use?**
+## License
 
+Apache-2.0
 
 ## Project status
 
