@@ -1,3 +1,4 @@
+import statistics
 import numpy as np
 from Input_Functions_econ import Input_Functions
 from Network_econ import Network
@@ -52,18 +53,20 @@ class Econ_Results:
 
         # reserve (pool) of token to be emitted as node rewards over time
         self.mixmining_pool = [self.config.mixmining_pool_initial] * self.config.num_intervals
-        # amount of circulating (liquid) tokens
+        # amount of circulating (liquid) tokens + locked tokens in accounts with less than 100k cap (eg testnet, opt2)
         self.circulating_tokens = [self.config.liquid_tokens_initial] * self.config.num_intervals
         # amount of tokens locked up with a vesting schedule
         self.unvested_tokens = [self.config.unvested_tokens_initial] * self.config.num_intervals
-        # maximum stake that could potentially be delegated, needed to compute stake saturation values per node
-        self.max_delegatable_stake = [self.config.beta * (self.config.total_token - self.config.mixmining_pool_initial)] * self.config.num_intervals
+
+        # maximum supply that could potentially be staked (initial value: constant until Q2)
+        self.max_effective_stake = [self.config.beta * self.circulating_tokens[0]] * self.config.num_intervals
+
         # saturation level per mix operator divides available stake share by k
-        self.stake_saturation_mix = np.divide(self.max_delegatable_stake, self.network.k)
+        self.stake_saturation_mix = np.divide(self.max_effective_stake, self.network.k)
         # amount of pledged stake to the whole set of nodes
-        self.pledged_stake = np.multiply(self.max_delegatable_stake, self.config.frac_token_pledged)
+        self.pledged_stake = np.multiply(self.max_effective_stake, self.config.frac_token_pledged)
         # amount of delegated stake to the whole set of nodes
-        self.delegated_stake = np.multiply(self.max_delegatable_stake, self.config.frac_token_delegated)
+        self.delegated_stake = np.multiply(self.max_effective_stake, self.config.frac_token_delegated)
 
         # Price per packet in dollar and token, over the intervals (currently set to constant)
         self.pp_dollar = self.input_functions.get_function(self.config.type_pp_growth)
@@ -130,8 +133,18 @@ class Econ_Results:
                                              self.mixmining_emitted[month-1] - self.rewards_unclaimed[month-1]
 
             # maximum available stake and saturation point
-            self.max_delegatable_stake[month] = self.config.beta * (self.config.total_token - self.mixmining_pool[month-1])
-            self.stake_saturation_mix[month] = self.max_delegatable_stake[month] / self.network.k[month]
+            if month < 3:  # no staking by big accounts with locked token in Q1
+                w_stake = self.circulating_tokens[month]
+            else:  # caps applied to large locked accounts for staking from Q2
+                capped_staking = self.config.number_vesting_accounts * self.config.cap_staking_unvested
+                w_stake = self.circulating_tokens[month] + capped_staking + self.config.frac_staking_unvested * (
+                        self.unvested_tokens[month] - capped_staking)
+
+            self.max_effective_stake[month] = self.config.beta * w_stake
+            self.stake_saturation_mix[month] = self.max_effective_stake[month] / self.network.k[month]
+            self.pledged_stake[month] = self.config.frac_token_pledged * self.max_effective_stake[month]
+            self.delegated_stake[month] = self.config.frac_token_delegated * self.max_effective_stake[month]
+
 
     ####################################
     # updates the conversion rate between token and dollar
@@ -219,7 +232,14 @@ class Econ_Results:
 
         # compute rewards distributed to each of the mixes (depending on their pledge, stake, performance)
         for mix in self.network.list_mix[month]:
+
+            # HACK to compute rewards when nodes are always active
+            #mix.received_rewards = 1.0 * mix.performance * self.income_global_mix[month] * \
+            #                       mix.sigma_node * self.network.k[month] * (work_active + self.config.alpha *
+            #                                                                 mix.lambda_node) / (1 + self.config.alpha)
+
             # received rewards (formula rewards paper) for the epochs when the node was active
+            # UNCOMMENT !!!!!!!!!!!!!
             mix.received_rewards = mix.activity_percent * mix.performance * self.income_global_mix[month] * \
                                    mix.sigma_node * self.network.k[month] * (work_active + self.config.alpha *
                                                                              mix.lambda_node) / (1 + self.config.alpha)
@@ -270,6 +290,19 @@ class Econ_Results:
 
         return dict_distr
 
+    def get_median_ROS_reputable_node(self):
+
+        median_ROS = [0] * self.config.num_intervals
+        for month in range(self.config.num_intervals):
+            ROS_set = []  # initialize set of ROS values for high reputation nodes (>0.9 saturation)
+            for node in self.network.list_mix[month]:
+                sat = self.get_node_value(node, 'saturation_percent')
+                if node.delegated > 0 and sat > 0.9:
+                    ROS_set.append(self.get_node_value(node, 'ROS_delegator'))
+            median_ROS[month] = statistics.median(ROS_set)
+
+        return median_ROS
+
     # returns the parameter value for a node
     def get_node_value(self, node, par):
 
@@ -313,6 +346,11 @@ class Econ_Results:
                 res = node.delegate_profit / node.delegated
             else:
                 res = None
+        elif par == 'APY_delegator':
+            if node.delegated > 0:
+                res = 12 * node.delegate_profit / node.delegated
+            else:
+                res = None
         else:
             res = None
             print("ISSUE: bad parameter type passed to get_node_value in Econ_results")
@@ -323,7 +361,7 @@ class Econ_Results:
     # function returns a dictionary with 2 scenarios: pledge or delegate to a mix node
     # for each of the two scenarios, sample nodes representing the rewards that the stakeholder would
     # obtain for pledging/delegating the available stake on a node
-    def sample_annualized_rewards_no_compound_vs_saturation(self, stake):
+    def sample_quarterly_rewards_no_compound_vs_saturation(self, stake):
 
         # rewards dictionary contains a dictionary for each of options: pledge/delegate on a mix
         rewards = {'pledge-mix': {}, 'sat-pledge-mix': {}, 'delegate-mix': {}, 'sat-delegate-mix': {}}
@@ -340,14 +378,16 @@ class Econ_Results:
                 # select nodes whose pledge value is around staking budget plus/minus 20%
                 if 0.8 * stake <= mix.pledge <= 1.2 * stake:
                     ros_mix_operator = self.get_node_value(mix, 'ROS_operator')
-                    rewards['pledge-mix'][month].append(stake * 12 * ros_mix_operator)
+                    #rewards['pledge-mix'][month].append(stake * 12 * ros_mix_operator)
+                    rewards['pledge-mix'][month].append(stake * 3 * ros_mix_operator)  # quarterly instead of annual
                     stake_saturation = self.get_node_value(mix, 'saturation_percent')
                     rewards['sat-pledge-mix'][month].append(stake_saturation)
 
                 # delegation only requires more delegated stake than investment
                 ros_mix_delegate = self.get_node_value(mix, 'ROS_delegator')
                 if (ros_mix_delegate is not None) and (stake <= mix.delegated):
-                    rewards['delegate-mix'][month].append(stake * 12 * ros_mix_delegate)
+                    #rewards['delegate-mix'][month].append(stake * 12 * ros_mix_delegate)
+                    rewards['delegate-mix'][month].append(stake * 3 * ros_mix_delegate)  # quarterly instead of annual
                     stake_saturation = self.get_node_value(mix, 'saturation_percent')
                     rewards['sat-delegate-mix'][month].append(stake_saturation)
 

@@ -1,9 +1,11 @@
+import cProfile
 import os
 import string
 import random
 from Configuration_econ import Config
 from Econ_Results_econ import Econ_Results
 from Plot_Results_econ import Plot_Results
+from Stakeholder_econ import Stakeholder
 
 # returns a random character string of a given length
 # used to generate a randomly named directory to save the results of a simulation run
@@ -97,12 +99,28 @@ def save_info_list_nodes(sample_month, path, results):
             f.write("received rewards: " + str(round(mix.received_rewards)))
             f.write(" ; operator profit: " + str(round(mix.operator_profit)))
             f.write(" ; delegate profit: " + str(round(mix.delegate_profit)) + "\n")
-            f.write("ROS operator: " + str(round(100 * mix.operator_profit / mix.pledge, 2)) + "%")
-            f.write(" ; annualized: " + str(round(12 * 100 * mix.operator_profit / mix.pledge, 2)) + "% \n")
+            f.write("Monthly returns operator: " + str(round(100 * mix.operator_profit / mix.pledge, 2)) + "%")
+            f.write(" ; APY (annualized, no compound): " + str(round(12 * 100 * mix.operator_profit / mix.pledge, 2)) + "% \n")
             if mix.delegated > 0:
-                f.write("ROS delegator: " + str(round(100 * mix.delegate_profit / mix.delegated, 2)) + "%")
-                f.write(" ; annualized: " + str(round(100 * 12 * mix.delegate_profit / mix.delegated, 2)) + "% \n")
+                f.write("Monthly returns delegator: " + str(round(100 * mix.delegate_profit / mix.delegated, 2)) + "%")
+                f.write(" ; APY (annualized, no compound): " + str(round(100 * 12 * mix.delegate_profit / mix.delegated, 2)) + "% \n")
             f.write("-----\n")
+
+
+def save_info_stakeholders(path, stakeholder):
+
+    file_name = path + "stakeholder_" + str(stakeholder.type_holder) + ".txt"
+
+    with open(file_name, "w") as f:
+        f.write("\n===\nType stakeholder: " + stakeholder.type_holder + "\n")
+        f.write("liquid: " + str(stakeholder.liquid_stake) + "\n")
+        f.write("unvested: " + str(stakeholder.unvested_stake) + "\n")
+        f.write("\neffective stake: " + str(stakeholder.effective_stake) + "\n")
+        f.write("effective compounded: " + str(stakeholder.effective_compounded_stake) + "\n")
+        f.write("\ntotal: " + str(stakeholder.total_stake) + "\n")
+        f.write("wealth compounded: " + str(stakeholder.wealth_compounded_stake) + "\n")
+        f.write("\nrewards per month: " + str(stakeholder.rewards) + "\n")
+        f.write("cumulative rewards: " + str(stakeholder.rewards_cumulative) + "\n")
 
 
 # Plot pre-defined bw demand functions available in the Input_Functions library
@@ -122,20 +140,29 @@ def display_save_plots(plot_res, save_to_file, path, config):
 
     file_name = ''  # if value of path and filename is '' then shows graphs in screen.
     max_years = config.num_intervals // 12
+    max_quarters = config.num_intervals // 3
 
     ####################
     # FIGS TYPE 1: rewards relative to node stake saturation and stake/pledge distribution over nodes
     ####################
 
-    # plot node, operator and delegate rewards relative to stake/pledge saturation of the node
-    vector_par_y = ['received_rewards', 'operator_profit', 'ROS_delegator']
-    vector_par_x = ['saturation_percent', 'pledge_saturation_percent']
-    for year in range(max_years):
+    # plot node, operator and delegate rewards relative to stake saturation (reputation) of the node
+    vector_par_y = ['received_rewards', 'operator_profit', 'ROS_delegator', 'activity_percent', 'reserve_percent']
+    par_x = 'saturation_percent'
+    for quarter in range(max_quarters):  #for year in range(max_years):
         for par_y in vector_par_y:
-            for par_x in vector_par_x:
-                if save_to_file:
-                    file_name = 'scatter_' + par_y + '_vs_' + par_x + '_y' + str(year+1) + '.png'
-                plot_res.plot_scatter_par_y_vs_par_x(path + file_name, par_y, par_x, year)
+            if save_to_file:
+                file_name = 'scatter_' + par_y + '_vs_reputation_Q' + str(quarter+1) + '.png'
+            plot_res.plot_scatter_par_y_vs_par_x(path + file_name, par_y, par_x, quarter)
+
+    # plot node, operator and delegate rewards relative to pledge saturation of the node
+    vector_par_y = ['received_rewards', 'operator_profit', 'ROS_delegator']
+    par_x = 'pledge_saturation_percent'
+    for quarter in range(max_quarters):  #for year in range(max_years):
+        for par_y in vector_par_y:
+            if save_to_file:
+                file_name = 'scatter_' + par_y + '_vs_' + par_x + '_Q' + str(quarter+1) + '.png'
+            plot_res.plot_scatter_par_y_vs_par_x(path + file_name, par_y, par_x, quarter)
 
     # plot the pledge/reputation distribution among nodes for a few sample months
     for year in range(0, max_years + 1):
@@ -145,16 +172,16 @@ def display_save_plots(plot_res, save_to_file, path, config):
         plot_res.plot_distribution_pledges_stake(path + file_name, sample_month)
 
     # plot rewards from pledging vs delegating a certain amount of stake to a node
-    for stake in [10 ** 6, 10 ** 5, 10 ** 4, 10 ** 3]:
-        for year in range(1, max_years + 1):
+    for stake in [10 ** 4, 10 ** 3, 100]:
+        for quarter in range(1, max_quarters+1):  #for year in range(1, max_years + 1):
             if save_to_file:
-                file_name = 'scatterplot_returns_staking_' + str(stake) + '_y' + str(year) + '.png'
-            plot_res.scatterplot_rewards_staking(path + file_name, stake, year)
+                file_name = 'scatterplot_returns_staking_' + str(stake) + '_Q' + str(quarter) + '.png'
+            plot_res.scatterplot_rewards_staking(path + file_name, stake, quarter)
 
     # Return on Stake for delegates: yearly delegate rewards divided by the amount of delegated stake (per node)
     for par in ['ROS_delegator_year']:
         if save_to_file:
-            file_name = 'ROS_delegates_annualized.png'
+            file_name = 'APY_delegates_annualized.png'
         plot_res.plot_yearly_ROS_distributions(path + file_name, par)
 
     ####################
@@ -168,7 +195,7 @@ def display_save_plots(plot_res, save_to_file, path, config):
     ####################
 
     file_name = ''  # if value of path and filename is '' then shows graphs in screen.
-    for par in ['pledge', 'total_stake', 'received_rewards', 'operator_profit', 'ROS_delegator', 'activity_percent']:
+    for par in ['pledge', 'total_stake', 'received_rewards', 'operator_profit', 'APY_delegator', 'activity_percent']:
         if save_to_file:
             file_name = 'nodes_distribution_' + str(par) + '.png'
         plot_res.plot_node_parameter_distributions(path + file_name, par)
@@ -211,6 +238,25 @@ def display_save_plots(plot_res, save_to_file, path, config):
         plot_res.plot_nr_operators(path + file_name)
 
 
+def stakeholder_plots(plot_res, save_to_file, path, config):
+
+    file_name = ""
+    median_ROS = plot_res.results.get_median_ROS_reputable_node()
+    if save_to_file:
+        file_name = 'median_ROS_high_rep_nodes.png'
+    plot_res.plot_median_ROS(path + file_name, median_ROS)
+    print("median ROS:" + str(median_ROS))
+
+    stakeholders = ['TESTNET', 'OPTION_1', 'OPTION_2', 'VALIDATOR_100k', 'VALIDATOR_200k', 'VALIDATOR_400k',
+                    'WHALE_1M', 'WHALE_10M', 'WHALE_80M']
+    for s in stakeholders:
+        stakeholder = Stakeholder(s, config)
+        stakeholder.compute_rewards(median_ROS)
+        if save_to_file:
+            file_name = 'stakeholder_' + s + '.png'
+        plot_res.plot_stakeholder_staking(path + file_name, stakeholder)
+        save_info_stakeholders(path, stakeholder)
+
 # main function that instantiates the classes to run a simulation of the system with a the given configuration
 def run_model(save_to_file):
 
@@ -234,15 +280,19 @@ def run_model(save_to_file):
     # FOURTH call the desired plotting functions to look into system variables and results of interest
     display_save_plots(plot_res, save_to_file, path, config)
 
-    # print the list of nodes for a month to see if all node variables look ok
-    for sample_month in [0, 11]:
+    # FIFTH print the list of nodes for a month to see if all node variables look ok
+    for sample_month in [0]:#[0, 11]:
         if save_to_file:  # save info in a file
             save_info_list_nodes(sample_month, path, results)
         else:  # print the info to screen
             print_info_list_nodes(sample_month, results)
+
+    # SIXTH compute results for specific stakeholders
+    #stakeholder_plots(plot_res, save_to_file, path, config)
 
 
 if __name__ == '__main__':
 
     save_results_to_file = True  # True / False : if True, plots are saved to file, if False, they are shown on screen
     run_model(save_results_to_file)
+    #cProfile.run('run_model(save_results_to_file)')

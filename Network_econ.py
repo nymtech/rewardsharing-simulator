@@ -243,3 +243,49 @@ class Network:
 
         return activity_vector, reserve_vector
 
+    # DOES NOT WORK DUE TO WEIGHTS VECTOR NOT ADDING UP TO ONE (due to rounding errors)
+    def sample_work_share_mixes_new(self, month):
+
+        list_mix = []
+        list_weights = []
+        for mix in self.list_mix[month]:
+            list_mix.append(mix.serial)
+            list_weights.append(mix.sigma_node)
+
+        norm_weights = list_weights / np.sum(list_weights)
+        norm_weights = norm_weights / np.sum(norm_weights)
+        print("sum norm=", sum(norm_weights))
+
+        # number of mixes actively routing packets in the mixnet
+        mix_active = self.config.mixnet_layers * self.mixnet_width[month]
+        mix_reserve = self.k[month] - mix_active
+
+        activity_samples = {}  # dictionary of mix nodes
+        for mix_id in range(self.num_mixes[month]):
+            activity_samples[mix_id] = []  # per mix node : vector to track active and reserve epochs
+
+        iterations = 30 * 24  # epochs in a month
+        for epoch in range(iterations):
+            weights_copy = norm_weights[:]  # temporary copy of list_weights
+            # vector of mix nodes in the active set
+            current_active = np.random.choice(list_mix, size=mix_active, replace=False, p=norm_weights)
+            for mix_id in current_active:
+                weights_copy[mix_id] = 0.0
+            norm_weights_copy = weights_copy / np.sum(weights_copy)
+
+            # vector of mix nodes in the reserve set
+            current_reserve = np.random.choice(list_mix, size=mix_reserve, replace=False, p=norm_weights_copy)
+            # add to the samples of the nodes whether they where active or in reserve in the epoch
+            for active_mix in current_active:
+                activity_samples[active_mix].append('A')
+            for reserve_mix in current_reserve:
+                activity_samples[reserve_mix].append('R')
+
+        activity_vector = [0] * self.num_mixes[month]  # list with % of epochs in which each node has been active
+        reserve_vector = [0] * self.num_mixes[month]  # list with % of epochs in which each node has been reserve
+        for i in range(self.num_mixes[month]):
+            activity_vector[i] = activity_samples[i].count('A') / iterations
+            reserve_vector[i] = activity_samples[i].count('R') / iterations
+
+        return activity_vector, reserve_vector
+

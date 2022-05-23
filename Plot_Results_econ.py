@@ -16,14 +16,14 @@ class Plot_Results:
     # stake is the available stake to pledge or delegate
     # creates scatterplots with returns the stakeholder would have obtained pledging/delegating that amount to mix nodes
     # samples mix nodes with amounts of pledge/delegation compatible with the specified stake in the specified year
-    def scatterplot_rewards_staking(self, file_name, stake, year):
+    def scatterplot_rewards_staking(self, file_name, stake, quarter):
 
-        rewards = self.results.sample_annualized_rewards_no_compound_vs_saturation(stake)
+        rewards = self.results.sample_quarterly_rewards_no_compound_vs_saturation(stake)
         sequence_x_vals_pledge = []
         sequence_y_vals_pledge = []
         sequence_x_vals_del = []
         sequence_y_vals_del = []
-        for month in range(12*(year-1), 12*year):  # range(self.config.num_intervals):
+        for month in range(3*(quarter-1), 3*quarter):  # range(self.config.num_intervals):
             for i in range(len(rewards['pledge-mix'][month])):
                 value_y = rewards['pledge-mix'][month][i]
                 value_x = rewards['sat-pledge-mix'][month][i]
@@ -53,7 +53,7 @@ class Plot_Results:
         ax.scatter(sequence_x_vals_pledge, sequence_y_vals_pledge, s=100, alpha=0.7, c='tab:green', label='pledge of ' + inv_str + ' NYM')
 
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
-        ax.set_ylabel('Y' + str(year) + ': Annualized rewards for staking ' + inv_str + ' NYM ', fontsize=14)
+        ax.set_ylabel('Q' + str(quarter) + ': Quarterly rewards for staking ' + inv_str + ' NYM ', fontsize=14)
         ax.set_xlabel('node stake saturation (node reputation)', fontsize=14)
         plt.setp(ax.get_yticklabels(), fontsize=14)
         plt.setp(ax.get_xticklabels(), fontsize=14)
@@ -72,11 +72,11 @@ class Plot_Results:
     # This function produces a scatterplot where each point has x,y coordinates as indicated in the inputs par_x, par_y
     # selects results for the 12 months of the specified year
     # annualizes results by multiplying monthly results by 12 (no compounding effects accounted for)
-    def plot_scatter_par_y_vs_par_x(self, file_name, par_y, par_x, year):
+    def plot_scatter_par_y_vs_par_x(self, file_name, par_y, par_x, quarter):
 
         sequence_containing_x_vals = []
         sequence_containing_y_vals = []
-        for month in range(year*12, (year+1)*12):
+        for month in range(quarter*3, (quarter+1)*3):
             for node in self.results.network.list_mix[month]:
                 val_y = self.results.get_node_value(node, par_y)
                 if par_y in ['received_rewards', 'operator_profit', 'ROS_delegator'] and val_y is not None:
@@ -90,7 +90,7 @@ class Plot_Results:
         plt.scatter(sequence_containing_x_vals, sequence_containing_y_vals)
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
         ax.set_ylabel('Mix nodes:  ' + par_y + '  vs  ' + par_x, fontsize=14)
-        ax.set_xlabel(par_x, fontsize=14)
+        ax.set_xlabel(par_x + ' Q' + str(quarter+1), fontsize=14)
         plt.setp(ax.get_yticklabels(), fontsize=14)
         plt.setp(ax.get_xticklabels(), fontsize=14)
         if len(file_name) < 2:
@@ -132,6 +132,8 @@ class Plot_Results:
         #    plt.gca().set_ylim(bottom=-0.005, top=0.2)
             #plt.gca().set_ylim(bottom=-5, top=15)
 
+        if par == 'ROS_delegator_year':
+            par = 'APY (no compound) delegates'
         ax.set_ylabel('distribution of: ' + str(par), fontsize=14)
         if len(file_name) < 2:
             plt.show()
@@ -146,7 +148,7 @@ class Plot_Results:
     def plot_node_parameter_distributions(self, file_name, par):
 
         dict_par = self.results.get_dictionary_distribution(par)
-        if par == 'ROS_delegator' or par == 'delegate_profit':  # clean up the None
+        if par == 'ROS_delegator' or par == 'delegate_profit' or par == 'APY_delegator':  # clean up the None
             for month in range(self.config.num_intervals):
                 dict_par[month] = [i for i in dict_par[month] if i is not None]
 
@@ -171,6 +173,46 @@ class Plot_Results:
         #elif par in ['pledge', 'total_stake']:
         #    plt.gca().set_ylim(bottom=-20000, top=1300000)
 
+        if len(file_name) < 2:
+            plt.show()
+        else:
+            plt.savefig(file_name)
+        plt.close()
+
+    # plots the median return on stake for nodes with >0.9 saturation
+    def plot_median_ROS(self, file_name, median_ROS):
+        annualized_ROS = []
+        for val in median_ROS:
+            annualized_ROS.append(val*12)
+        fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
+        ax = fig.add_subplot()
+        ax.plot(annualized_ROS, '-', linewidth=2, label='annualized reward rate')
+        ax.set_xlabel('interval (monthly)', fontsize=14)
+        ax.set_ylabel('Annualized reward rate (median for delegates of high reputation nodes)', fontsize=14)
+        plt.setp(ax.get_xticklabels(), fontsize=14)
+        plt.setp(ax.get_yticklabels(), fontsize=14)
+        ax.legend()
+        ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
+        if len(file_name) < 2:
+            plt.show()
+        else:
+            plt.savefig(file_name)
+        plt.close()
+
+    # plots the stake of the given stakeholder
+    def plot_stakeholder_staking(self, file_name, stakeholder):
+        fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
+        ax = fig.add_subplot()
+        ax.plot(stakeholder.wealth_compounded_stake, '-', linewidth=2, label='total stake (compounded wealth)')
+        ax.plot(stakeholder.unvested_stake, '-', linewidth=1, label='unvested stake')
+        ax.plot(stakeholder.rewards_cumulative, '-', linewidth=2, label='cumulative rewards')
+
+        ax.set_xlabel('interval (monthly)', fontsize=14)
+        ax.set_ylabel('Rewards for participant: ' + stakeholder.type_holder, fontsize=14)
+        plt.setp(ax.get_xticklabels(), fontsize=14)
+        plt.setp(ax.get_yticklabels(), fontsize=14)
+        ax.legend()
+        ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
         if len(file_name) < 2:
             plt.show()
         else:

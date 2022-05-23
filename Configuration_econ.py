@@ -6,7 +6,7 @@ class Config:
     def __init__(self):
 
         # nr of months of operation for which functions are computed. Example: 12 * 5 corresponds to 5 years
-        self.num_intervals = 12 * 2 + 1  # number of monthly reward intervals considered
+        self.num_intervals = 3  # number of monthly reward intervals considered
 
         # bandwidth growth and fees: key variable!
         # Set to BW_ZERO for no traffic and to BW_EXP_CAPPED_10%_HALVES_4x for slow growth (Input_Functions options)
@@ -17,14 +17,17 @@ class Config:
         self.total_token = 10**9  # one billion token in total
         self.mixmining_pool_initial = 250 * 10**6   # 250 million token in the mixmining pool
         self.emission_rate = 0.02  # emit 2% of mixmining pool each month
-        self.liquid_tokens_initial = 75 * 10**6  # liquid (circulating) tokens at the very beginning
-        self.unvested_tokens_initial = 675 * 10**6  # token on vesting schedule
+        self.liquid_tokens_initial = 98.5 * 10**6 #100 * 10**6  # 100M approx includes liquid + testnet + option 2 + validators
+        self.unvested_tokens_initial = self.total_token - self.mixmining_pool_initial - self.liquid_tokens_initial  # token on vesting schedule
+        self.number_vesting_accounts = 50  # unvested accounts subject to staking cap
+        self.cap_staking_unvested = 10**5  # 100k cap per account with locked tokens
+        self.frac_staking_unvested = 0.01  # fraction of unvested token over cap that can be staked
         self.vesting_period = 2 * 12  # vesting over 2 years
         self.vesting_interval = 3  # vesting 1/8th every 3 months
 
         # % of available token pledged and delegated to nodes (sum of both < 1.0, with the rest unallocated)
-        self.frac_token_pledged = 0.15  # % of available token pledged to mix nodes
-        self.frac_token_delegated = 0.60  # % of available token delegated by stakeholders to mix nodes run by others
+        self.frac_token_pledged = 0.03  # % of available token pledged to mix nodes
+        self.frac_token_delegated = 0.22  # % of available token delegated by stakeholders to mix nodes run by others
 
         # percentage of bandwidth fees allocated to the set of mix nodes and to the set of gateways
         self.bw_to_mix = 0.6  # fraction of bw income that goes to mix nodes
@@ -33,11 +36,11 @@ class Config:
         # node parameters (these values are the same for all nodes)
         self.node_profit_margin = 0.1  # % of delegate rewards taken by the node operator (set by the node itself)
         self.node_performance = 1.0  # % of correctly routed packets (measured externally)
-        self.minimum_pledge_mix = 1000  # in token, minimum pledge required to register as mix node
+        self.minimum_pledge_mix = 100  # in token, minimum pledge required to register as mix node
 
         # parameters for node stake distribution, reward algorithm, work factor
-        self.frac_min_pledge_mix = 0.5  # % of total registered nodes that have the minimum pledge: key variable!
-        self.frac_whale_mix = self.frac_token_pledged / 4  # % out of k (NOT total) of nodes with saturated pledge
+        self.frac_min_pledge_mix = 0.75  # % of total registered nodes that have the minimum pledge: key variable!
+        self.frac_whale_mix = 0 #self.frac_token_pledged / 10  # % out of k (NOT total) of nodes with saturated pledge
         self.beta = 1.0  # percent of available stake needed to reach saturation for all nodes
         self.alpha = 0.30  # sybil-protection parameter in the reward algorithm (premium for larger pledge)
         self.factor_work_active = 10  # the work of active nodes is this factor's times the work of idle nodes
@@ -61,8 +64,8 @@ class Config:
         self.cost_mix_dummy = self.cost_packet_bw_initial_dollar * 4000 * 3600 * 24 * 30
 
         # monthly flat costs of mix nodes
-        self.monthly_cost_cpu_initial_dollar = 12.5  # $ per month per CPU (for a mix) as a flat monthly cost
-        self.cpus_per_mix_initial = 8  # number of cpus per mix
+        self.monthly_cost_cpu_initial_dollar = 10  # $ per month per CPU (for a mix) as a flat monthly cost
+        self.cpus_per_mix_initial = 4  # number of cpus per mix
         self.cpu_capacity_initial = 3125  # sphinx packets per second per cpu (from implementation benchmarks)
 
         # type growth parameters allow considering evolution over time (see Input_Functions_econ.py)
@@ -75,12 +78,12 @@ class Config:
         self.mixnet_layers = 3  # number of layers
         self.type_mixnet_growth = 'MIXNET_LINEAR_GROWTH_WITH_TRAFFIC'  # nr of mixes: computed as function of traffic
         self.nr_min_mixes = 720  # k is never smaller than this number, regardless of (no) user traffic
-        self.min_mixnet_width = 120  # minimum network width: determines the number of active mixes (LW)
+        self.min_mixnet_width = 200  # minimum network width: determines the number of active mixes (LW)
 
         # mix_active_rate: key variable! provides tradeoff between "waste" of resources (unused mixes in reserve) and
         # capacity to grow fast if demand increases within the same month, without the need to adjust k (and re-stake)
         # a value of 1/2 implies on average half the selected (rewarded) nodes are active and the other half in reserve
-        self.mix_active_rate = 1/2  # fraction of k mixes that are active, the rest are in "reserve" (MUST be <= 1)
+        self.mix_active_rate = 600/720  # fraction of k mixes that are active, the rest are in "reserve" (MUST be <= 1)
 
         # peak_factor: key variable! determines another tradeoff between "waste" of resources (unused capacity per mix
         # on average) and capacity to serve peaks in demands when traffic is highly (and fast) variable
@@ -89,5 +92,5 @@ class Config:
 
         # excess_candidate_factor: expect many more node node registrations than equilibrium value k. Beyond certain
         # point (bigger than 2), it does not make a diff in results of interest while slowing down sim
-        self.excess_candidate_factor = 2  # multiplicative factor of actual mix candidates wrt to k (MUST be >= 1)
+        self.excess_candidate_factor = 1  # multiplicative factor of actual mix candidates wrt to k (MUST be >= 1)
 
