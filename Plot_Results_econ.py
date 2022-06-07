@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 # This class takes a results object and provides a library of plot functions to visualize results of interest
-# The plots can be shown on screen (by passing file_name='' to the functions) or saved to a file
+# The plots can be shown on screen (by passing file_path=None to the functions) or saved to a file
 # The first set of functions show results of a run of the model, while the last functions plot the library of
 # pre-defined input functions for different variables
 
@@ -16,7 +16,7 @@ class Plot_Results:
     # stake is the available stake to pledge or delegate
     # creates scatterplots with returns the stakeholder would have obtained pledging/delegating that amount to mix nodes
     # samples mix nodes with amounts of pledge/delegation compatible with the specified stake in the specified year
-    def scatterplot_rewards_staking(self, file_name, stake, quarter):
+    def scatterplot_rewards_staking(self, file_path, stake, quarter):
 
         rewards = self.results.sample_quarterly_rewards_no_compound_vs_saturation(stake)
         sequence_x_vals_pledge = []
@@ -63,16 +63,16 @@ class Plot_Results:
 
         ax.legend()
         ax.grid(True)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # This function produces a scatterplot where each point has x,y coordinates as indicated in the inputs par_x, par_y
     # selects results for the 12 months of the specified year
     # annualizes results by multiplying monthly results by 12 (no compounding effects accounted for)
-    def plot_scatter_par_y_vs_par_x(self, file_name, par_y, par_x, quarter):
+    def plot_scatter_par_y_vs_par_x(self, file_path, par_y, par_x, quarter):
 
         sequence_containing_x_vals = []
         sequence_containing_y_vals = []
@@ -93,14 +93,14 @@ class Plot_Results:
         ax.set_xlabel(par_x + ' Q' + str(quarter+1), fontsize=14)
         plt.setp(ax.get_yticklabels(), fontsize=14)
         plt.setp(ax.get_xticklabels(), fontsize=14)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots annualized ROS for operators / delegators of nodes of type_node owned by owner
-    def plot_yearly_ROS_distributions(self, file_name, par):
+    def plot_yearly_ROS_distributions(self, file_path, par):
 
         if par == 'ROS_delegator_year':  # clean up the None
             dict_par = self.results.get_dictionary_distribution('ROS_delegator')
@@ -135,17 +135,17 @@ class Plot_Results:
         if par == 'ROS_delegator_year':
             par = 'APY (no compound) delegates'
         ax.set_ylabel('distribution of: ' + str(par), fontsize=14)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # Distribution of a variable (shown as boxplots) in a set of nodes, one boxplot per interval
-    # if file_name = '' (empty) the function plots on screen, if file_name provided, fig is saved to file_name
+    # if file_path is None the function plots on screen, if file_path provided, fig is saved to file_path directory
     # par is the parameter of interest that we want to display. Possible values are: 'pledge' 'delegated' 'total_stake'
     # 'node_cost' 'received_rewards' 'operator_profit' 'delegate_profit' 'sigma' 'lambda' 'ROS_operator' 'ROS_delegator'
-    def plot_node_parameter_distributions(self, file_name, par):
+    def plot_node_parameter_distributions(self, file_path, par):
 
         dict_par = self.results.get_dictionary_distribution(par)
         if par == 'ROS_delegator' or par == 'delegate_profit' or par == 'APY_delegator':  # clean up the None
@@ -173,14 +173,14 @@ class Plot_Results:
         #elif par in ['pledge', 'total_stake']:
         #    plt.gca().set_ylim(bottom=-20000, top=1300000)
 
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots the median return on stake for nodes with >0.9 saturation
-    def plot_median_ROS(self, file_name, median_ROS):
+    def plot_median_ROS(self, file_path, median_ROS):
         annualized_ROS = []
         for val in median_ROS:
             annualized_ROS.append(val*12)
@@ -193,14 +193,14 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots the stake of the given stakeholder
-    def plot_stakeholder_staking(self, file_name, stakeholder):
+    def plot_stakeholder_staking(self, file_path, stakeholder):
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
         ax.plot(stakeholder.wealth_compounded_stake, '-', linewidth=2, label='total stake (compounded wealth)')
@@ -213,14 +213,14 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots the maximum amount of stake per mix node (saturation point)
-    def plot_stake_saturation_node(self, file_name):
+    def plot_stake_saturation_node(self, file_path):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
@@ -231,14 +231,14 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plot cumulative liquidity emitted from the mixmining pool
-    def plot_cumulative_mixmining_liquidity(self, file_name):
+    def plot_cumulative_mixmining_liquidity(self, file_path):
 
         cumul = self.results.mixmining_pool[0] - self.results.mixmining_pool[1]
         cumulative_emissions = [cumul]
@@ -261,15 +261,15 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=-10**4, top=15*10**6)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plot total income to the network including the split between emitted mixmining rewards and collected bw fees
     # plot rewards rewards distributed and rewards unclaimed (thus returned to mixmining pool)
-    def plot_rewards_distributed_unclaimed(self, file_name):
+    def plot_rewards_distributed_unclaimed(self, file_path):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
@@ -288,14 +288,14 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=-10**4, top=15*10**6)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots the amount of token in the mixmining pool, in circulation, and unvested
-    def plot_vesting_circulating_token(self, file_name):
+    def plot_vesting_circulating_token(self, file_path):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
@@ -308,14 +308,14 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=0)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plots the considered bandwidth demand (pre-set input function configured in Config)
-    def plot_total_bw(self, file_name):
+    def plot_total_bw(self, file_path):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
@@ -326,15 +326,15 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=0)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # plot the number of mix nodes nodes over time
     # the number follows the bandwidth demand in the network (grows from a minimum with demand)
-    def plot_nr_operators(self, file_name):
+    def plot_nr_operators(self, file_path):
 
         fig = plt.figure(figsize=(10, 8), dpi=90, facecolor='w', edgecolor='k')
         ax = fig.add_subplot()
@@ -345,16 +345,16 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=0)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # produces two figures corresponding to the specified month
     # the first figure shows the distribution of reputation (decreasing order) and its corresponding pledge per node
     # the second figure shows the distribution of pledges (in decreasing size) for the node set
-    def plot_distribution_pledges_stake(self, file_name, month):
+    def plot_distribution_pledges_stake(self, file_path, month):
 
         nr_mixes = len(self.results.network.list_mix[month])
         pledges = []
@@ -392,10 +392,10 @@ class Plot_Results:
         ax.axvline(x=k, color='tab:brown', linewidth=2, linestyle='--')
         ax.legend()
         #plt.gca().set_ylim(bottom=-10000)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name + 'total_stake.png')
+            plt.savefig(file_path.parent / (file_path.stem + 'total_stake.png'))
         plt.close()
 
         ordered_by_pledge = sorted(ordered_pledges, reverse=True)
@@ -406,15 +406,15 @@ class Plot_Results:
         ax.set_xlabel("Registered nodes (ordered by pledge)", fontsize=12)
         ax.axhline(y=0, color='r', linewidth=1, linestyle='-')
         ax.legend()
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name + 'pledge.png')
+            plt.savefig(file_path.parent / (file_path.stem + 'pledge.png'))
         plt.close()
 
     # Plot pre-defined bandwidth growth functions that are available in Input_Functions
     # useful to see which functions are available and which one to choose for scenarios with more or less bw demand
-    def plot_preset_bw_growth_functions(self, file_name):
+    def plot_preset_bw_growth_functions(self, file_path):
 
         # add types if needed: check Input_Functions_econ.py and see types starting with 'BW_'
         types = ['BW_EXP_CAPPED_10%_HALVES_10x', 'BW_EXP_CAPPED_10%_DROP1/3_4x', 'BW_EXP_GROWTH_6%_STEADY',
@@ -432,10 +432,10 @@ class Plot_Results:
         plt.setp(ax.get_yticklabels(), fontsize=14)
         ax.legend()
         #plt.gca().set_ylim(bottom=0)
-        if len(file_name) < 2:
+        if file_path is None:
             plt.show()
         else:
-            plt.savefig(file_name)
+            plt.savefig(file_path)
         plt.close()
 
     # function takes a vector of function type strings and returns a dictionary with the functions, indexed by
