@@ -18,13 +18,13 @@ The six classes are:
 
 ## How to run a simulation (basic)
 
-**Step 0**: download the seven .py files to a machine that can run python scripts, making sure you have a subdirectory 'Figures' (`mkdir Figures`) 
+**Step 0**: download the seven .py files to a machine that can run python scripts
 
 **Step 1**: edit the file `Configuration_econ.py` to set the scenario (input variables) that you want to simulate
 
 **Step 2**: run the simulation with the following command: `python3 main.py`
 
-**Step 3**: once the simulation has ended, see the results in the Figures directory
+**Step 3**: once the simulation has ended, see the results in the Output directory
 
 
 ## Tinkering with the simulation
